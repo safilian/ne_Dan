@@ -58,9 +58,6 @@ def extract_section_content(all_text, page_number, start_index, end_index):
 
 def split_into_paragraphs(text):
     """Splits the text into a list of paragraphs."""
-    # You'll need to implement the logic here. Possibilities:
-    #   1. Splitting by double newlines ('\n\n') 
-    #   2. More sophisticated paragraph detection if needed.
     return text.split("\n \n") 
 
 

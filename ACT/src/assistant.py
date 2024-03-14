@@ -49,6 +49,8 @@ run = client.beta.threads.runs.create(
     instructions="Please address the user as James Bond", 
 )
 
+client.beta.assistants.delete(assistant_id='asst_YGQtM7ETpe6Cf19wwUiBaO6y')
+
 def wait_for_run_completion(client, thread_id, run_id, sleep_interval=5):
     """
 
