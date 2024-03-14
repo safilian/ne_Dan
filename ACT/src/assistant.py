@@ -8,8 +8,8 @@ client = OpenAI()
 model = 'gpt-3.5-turbo'
 
 # harcode our ids:
-assistant_id = 'asst_kxs20F0Z7d1wxktDleMuS0sm'
-thread_id = 'thread_ykdHfgOs0E6mEMU3MgH8PxNO'
+assistant_id = None
+thread_id = None
 
 # === Create Assistant ===
 class ACT_Assistant:
@@ -44,6 +44,7 @@ class ACT_Assistant:
         )
         self.assistant_id = assistant.id
         print(f"Assistant created with ID: {self.assistant_id}")
+        return self.id
 
     def create_thread(self, user_message):
         thread = client.beta.threads.create(
@@ -97,62 +98,63 @@ class ACT_Assistant:
 
 
 # === Create Assistant and Run ===
-assistant = ACT_Assistant(assistant_id, thread_id)
-assistant.create_assistant()
+if not assistant_id or not thread_id:
+    assistant = ACT_Assistant(None, None)
+    assistant_id = assistant.create_assistant()
 assistant.create_thread("What is the goal of an ACT tree paragraph node?")
 assistant.send_message("I want to know the goal of an ACT tree paragraph node.")
 assistant.run_assistant()
 
 
-message = 'What is the best way to lose fat and build lean muscles?'
-message = client.beta.threads.messages.create(
-    thread_id=thread_id,
-    role='user',
-    content=message
-)
+# message = 'What is the best way to lose fat and build lean muscles?'
+# message = client.beta.threads.messages.create(
+#     thread_id=thread_id,
+#     role='user',
+#     content=message
+# )
 
-run = client.beta.threads.runs.create(
-    thread_id=thread_id,
-    assistant_id=assistant_id,
-    instructions="Please address the user as James Bond", 
-)
+# run = client.beta.threads.runs.create(
+#     thread_id=thread_id,
+#     assistant_id=assistant_id,
+#     instructions="Please address the user as James Bond", 
+# )
 
-client.beta.assistants.delete(assistant_id='asst_YGQtM7ETpe6Cf19wwUiBaO6y')
+# client.beta.assistants.delete(assistant_id='asst_YGQtM7ETpe6Cf19wwUiBaO6y')
 
-def wait_for_run_completion(client, thread_id, run_id, sleep_interval=5):
-    """
+# def wait_for_run_completion(client, thread_id, run_id, sleep_interval=5):
+#     """
 
-    Waits for a run to complete and prints the elapsed time.:param client: The OpenAI client object.
-    :param thread_id: The ID of the thread.
-    :param run_id: The ID of the run.
-    :param sleep_interval: Time in seconds to wait between checks.
-    """
-    while True:
-        try:
-            run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
-            if run.completed_at:
-                elapsed_time = run.completed_at - run.created_at
-                formatted_elapsed_time = time.strftime(
-                    "%H:%M:%S", time.gmtime(elapsed_time)
-                )
-                print(f"Run completed in {formatted_elapsed_time}")
-                logging.info(f"Run completed in {formatted_elapsed_time}")
-                # Get messages here once Run is completed!
-                messages = client.beta.threads.messages.list(thread_id=thread_id)
-                last_message = messages.data[0]
-                response = last_message.content[0].text.value
-                print(f"Assistant Response: {response}")
-                break
-        except Exception as e:
-            logging.error(f"An error occurred while retrieving the run: {e}")
-            break
-        logging.info("Waiting for run to complete...")
-        time.sleep(sleep_interval)
+#     Waits for a run to complete and prints the elapsed time.:param client: The OpenAI client object.
+#     :param thread_id: The ID of the thread.
+#     :param run_id: The ID of the run.
+#     :param sleep_interval: Time in seconds to wait between checks.
+#     """
+#     while True:
+#         try:
+#             run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
+#             if run.completed_at:
+#                 elapsed_time = run.completed_at - run.created_at
+#                 formatted_elapsed_time = time.strftime(
+#                     "%H:%M:%S", time.gmtime(elapsed_time)
+#                 )
+#                 print(f"Run completed in {formatted_elapsed_time}")
+#                 logging.info(f"Run completed in {formatted_elapsed_time}")
+#                 # Get messages here once Run is completed!
+#                 messages = client.beta.threads.messages.list(thread_id=thread_id)
+#                 last_message = messages.data[0]
+#                 response = last_message.content[0].text.value
+#                 print(f"Assistant Response: {response}")
+#                 break
+#         except Exception as e:
+#             logging.error(f"An error occurred while retrieving the run: {e}")
+#             break
+#         logging.info("Waiting for run to complete...")
+#         time.sleep(sleep_interval)
 
 
-# === Run ===
-wait_for_run_completion(client=client, thread_id=thread_id, run_id=run.id)
+# # === Run ===
+# wait_for_run_completion(client=client, thread_id=thread_id, run_id=run.id)
 
-# ==== Steps --- Logs ==
-run_steps = client.beta.threads.runs.steps.list(thread_id=thread_id, run_id=run.id)
-print(f"Steps---> {run_steps.data[0]}")
+# # ==== Steps --- Logs ==
+# run_steps = client.beta.threads.runs.steps.list(thread_id=thread_id, run_id=run.id)
+# print(f"Steps---> {run_steps.data[0]}")
