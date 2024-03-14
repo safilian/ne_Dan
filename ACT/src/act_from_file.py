@@ -98,25 +98,25 @@ def build_act_tree(filepath: str):
             node.text = sections.get(node.name, "") 
 
     # # Content Association with Paragraphs 
-    # for node in root.level_order_iter():  
-    #     if node.nodeType == NodeType.SECTION: 
-    #         node.id = section_id  
-    #         section_id += 1 
+    for node in root.level_order_iter():  
+        if node.nodeType == NodeType.SECTION: 
+            node.id = section_id  
+            section_id += 1 
 
-    #         subsection_id = subsection_counters.get(node.id, 0) + 1  # Get or initialize
-    #         subsection_counters[node.id] = subsection_id # Update the counter
+            subsection_id = subsection_counters.get(node.id, 0) + 1  # Get or initialize
+            subsection_counters[node.id] = subsection_id # Update the counter
 
-    #         if not node.children:
-    #             paragraphs = split_into_paragraphs(node.text) 
-    #             print(len(paragraphs), node.name)
-
-
+            if not node.children:
+                paragraphs = split_into_paragraphs(node.text) 
+                print(len(paragraphs), node.name)
 
 
-    #             for paragraph_text in paragraphs:
-    #                 paragraph_node = ACTNode(0, paragraph_text[:5], NodeType.PARAGRAPH, paragraph_text, parent=node)
-    #                 paragraph_node.id = f"{node.id}.{subsection_id}"  
-    #                 subsection_id += 1 
+
+
+                for paragraph_text in paragraphs:
+                    paragraph_node = ACTNode(0, paragraph_text[:5], NodeType.PARAGRAPH, paragraph_text, parent=node)
+                    paragraph_node.id = f"{node.id}.{subsection_id}"  
+                    subsection_id += 1 
 
 
     return root
