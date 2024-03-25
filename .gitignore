@@ -19,3 +19,6 @@ Thumbs.db
 # ignore large data files
 /raw_data/
 /processed_data/
+
+# ignore environment files
+*.env
