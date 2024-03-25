@@ -1,11 +1,18 @@
 from enum import Enum
 import networkx as nx
 import matplotlib.pyplot as plt
-from anytree import NodeMixin, RenderTree
+from anytree import NodeMixin, RenderTree, AsciiStyle
 from anytree.exporter import UniqueDotExporter
 from anytree.iterators.levelorderiter import LevelOrderIter
 from anytree.iterators.postorderiter import PostOrderIter
+from anytree.exporter import JsonExporter
+from json import JSONEncoder
 
+class NodeTypeEncoder(JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, NodeType):
+            return obj.value
+        return super().default(obj)
 
 class NodeType(Enum):
     SECTION = "Section"
@@ -14,6 +21,7 @@ class NodeType(Enum):
     IMAGE = "Image"
     TABLE = "Table"
     TITLE = "Title"
+
 
 
 class ACTNode(NodeMixin):
@@ -32,7 +40,7 @@ class ACTNode(NodeMixin):
 
     def print_tree(self, indent=0):
         for pre, fill, node in RenderTree(self):
-            print("%s%s" % (pre, node.name))
+            print("%s%s" % (pre, node.id))
 
     def visualize_tree(self):
         UniqueDotExporter(self).to_picture("act_tree.png")
@@ -48,6 +56,40 @@ class ACTNode(NodeMixin):
             for child in PostOrderIter(self):
                 union_goal += child.goal
             self.goal = union_goal
+
+    def post_order_iter(self, **kwargs):
+        return PostOrderIter(self, **kwargs)
+    
+    def export_json(self, file_path):
+        exporter = JsonExporter(indent=4, sort_keys=True, default=NodeTypeEncoder().default)
+        with open(file_path, "w") as outfile:
+                exporter.write(self, outfile)
+        return exporter.export(self)
+    
+    def assign_hierarchical_ids(self):
+        node_id = 0 
+
+        for pre, _, node in RenderTree(self, style=AsciiStyle()):
+            if node.parent and node.parent.parent is None:
+                node_id += 1 
+            node.id = node_id
+            print(f"Global node_id: {node_id}")
+
+
+            if node.parent is not None:  
+                parent_depth = len(str(node.parent.id).split("."))
+                subsection_id = 1 
+                print(f"Node: {node.id}, Parent: {node.parent.id}")  # Added
+                for sibling in node.parent.children:
+                    if sibling == node and node.parent.parent is not None:  
+                        node.id = f"{node.parent.id}.{subsection_id}"
+                        print(f"Formatted ID: {node.id}") 
+                        break
+                    subsection_id += 1 
+
+
+
+
 
 
 

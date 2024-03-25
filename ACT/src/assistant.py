@@ -1,61 +1,68 @@
 from email import message
+from venv import create
 from openai import OpenAI
 import time
-import logging
-from datetime import datetime
+import os
+from dotenv import load_dotenv
+from torch import save
+
+load_dotenv()  # Load environment variables
 
 client = OpenAI()
 model = 'gpt-3.5-turbo'
 
-# harcode our ids:
-assistant_id = 'asst_kxs20F0Z7d1wxktDleMuS0sm'
-thread_id = 'thread_ykdHfgOs0E6mEMU3MgH8PxNO'
+
+def save_to_env_file(key, value):
+    with open(".env", "a") as f:  # Append mode
+        f.write(f"{key}={value}\n")
 
 # === Create Assistant ===
 class ACT_Assistant:
-    def __init__(self, assistant_id, thread_id):
-        self.assistant_id = assistant_id
-        self.thread_id = thread_id
+    def __init__(self):
+        ASSISTANT_ID = os.getenv("ASSISTANT_ID")
+        THREAD_ID = os.getenv("THREAD_ID") 
+
+        if not ASSISTANT_ID:
+            ASSISTANT_ID = self.create_assistant()
+            save_to_env_file("ASSISTANT_ID", ASSISTANT_ID)  
+
+        if not THREAD_ID:
+            THREAD_ID = self.create_thread("Hello, I have a paragraph that I would like to summarize.")
+            save_to_env_file("THREAD_ID", THREAD_ID)
+
+        
+        self.assistant_id = ASSISTANT_ID
+        self.thread_id = THREAD_ID
 
     def create_assistant(self):
         assistant = client.beta.assistants.create(
-            name="ACT Assistant",
+            name="Paragraph Summary Assistant",
             instructions="""
-            You are an ACT Assistant that generates the goal of an ACT tree node.
-            An ACT is a n Answer_based_Tree that represents the structure of a document.
-            Constructing_Answer_based_Tree(ACT, Answer) {
-            Input: Answer
-            Output: ACT tree
-
-            Create an empty ACT tree with a root node R with Null values
-            Expand ACT in such way that {
-                all internal nodes are related to the section or subsection
-                child nodes of a section node are subsections of the section or are paragraphs or captions in that section related to the section
-                all leaf nodes are related to paragraphs to caption
-                text of internal node is the title of the section
-                text of a leaf node is paragraph or section
-                For all leaf nodes N that are paragraphs, N.Goal = LLM_Pragraph_Main_Goal(N.Text)
-                For all leaf nodes N that are captions, N.Goal is a summary of the caption
-                For all internal node N, N.Goal = Union of all children goals
+            You are an assistant speacialised in summarizing paragraphs.
             }
-        }
             """,
             model=model
         )
-        self.assistant_id = assistant.id
-        print(f"Assistant created with ID: {self.assistant_id}")
+        ASSISTANT_ID = assistant.id
+        print(f"Assistant created with ID: {ASSISTANT_ID}")
+
+        self.assistant_id = ASSISTANT_ID  
+        return self.assistant_id
 
     def create_thread(self, user_message):
         thread = client.beta.threads.create(
             messages=[
                 {
                     'role': 'user',
-                    'content': user_message
+                        'content': user_message
                 }
             ]
         )
-        self.thread_id = thread.id
-        print(f"Thread created with ID: {self.thread_id}")
+        THREAD_ID = thread.id
+        print(f"Thread created with ID: {THREAD_ID}")
+
+        self.thread_id = THREAD_ID
+        return self.thread_id
 
     def send_message(self, message):
         message = client.beta.threads.messages.create(
@@ -69,13 +76,15 @@ class ACT_Assistant:
         run = client.beta.threads.runs.create(
             thread_id=self.thread_id,
             assistant_id=self.assistant_id,
-            instructions="Please generate the goal of an ACT tree paragraph node",
+            instructions="""Please extract the main goal or abstractive summary of a text for a paragraph node, 
+            main goal need to cover all concept mention in the text. Please provide the goal in less than 3 bullet points.""",
         )
         print(f"Assistant run created with ID: {run.id}")
-        self.wait_for_run_completion(run.id)
+        return self.wait_for_run_completion(run.id)
 
-    def wait_for_run_completion(self, run_id, sleep_interval=5):
-        while True:
+    def wait_for_run_completion(self, run_id, sleep_interval=5, max_retries=3):
+        retries = 0
+        while retries < max_retries:
             try:
                 run = client.beta.threads.runs.retrieve(thread_id=self.thread_id, run_id=run_id)
                 if run.completed_at:
@@ -88,71 +97,48 @@ class ACT_Assistant:
                     last_message = messages.data[0]
                     response = last_message.content[0].text.value
                     print(f"Assistant Response: {response}")
-                    break
+                    return response
             except Exception as e:
                 print(f"An error occurred while retrieving the run: {e}")
-                break
-            print("Waiting for run to complete...")
-            time.sleep(sleep_interval)
+                retries += 1
+                if retries < max_retries:
+                    print(f"Retrying in {sleep_interval} seconds...")
+                    time.sleep(sleep_interval)
+                else:
+                    print("Maximum retries exceeded. Terminating the run.")
+                    # self.delete_thread_by_id(self.thread_id)
+                    return None
+        else:
+            print("Maximum retries exceeded. Terminating the run.")
+            self.delete_thread_by_id(self.thread_id)
+        
+        def delete_thread_by_id(self, thread_id):
+            client.beta.threads.delete(thread_id=thread_id)
+            print(f"Thread {thread_id} deleted")
 
+        def list_all_threads(self):
+            threads = client.beta.threads.list()
+            print(f"Threads: {threads}")
 
-# === Create Assistant and Run ===
-assistant = ACT_Assistant(assistant_id, thread_id)
-assistant.create_assistant()
-assistant.create_thread("What is the goal of an ACT tree paragraph node?")
-assistant.send_message("I want to know the goal of an ACT tree paragraph node.")
-assistant.run_assistant()
+# assistant = ACT_Assistant()
 
+# SAMPLE_PARAGRAPH = """
+# ITIC global as many big names partner under their belt and the deliverable products they are
+# working with has vast concept in upcoming times like cloud services, networking, cyber
+# security, The ITIC is providing great opportunities to the new students of background of data
+# science, cyber security and network engineers as well as it also providing the research
+# centre for artificial intelligence which is remarkable and giving hands on experience of
+# working on Telstra product and services for the students its big opportunity to grab in this
+# crucial times where pandemic has given us big hit in all regards to have the opportunity to
+# explore all these learning from the university was quite a challenge due to past
+# circumstances while ITIC has taken the lead in that learning department and providing the
+# chance to learn in professional environment will open new gates of opportunities for the
+# students. The career consulting you get while getting their training program it should be
+# highlighted here as it’s not an easy thing to get in real world. ITIC is doing an great job of
+# creating opportunities in all big tech fields which is going to change the world and having
+# experience to learn on cisco technologies for networking students is a great way of
+# experiencing their theoretical concepts.
+# """
+# assistant.send_message("Paragraph:\n" + SAMPLE_PARAGRAPH)
+# assistant.run_assistant()
 
-message = 'What is the best way to lose fat and build lean muscles?'
-message = client.beta.threads.messages.create(
-    thread_id=thread_id,
-    role='user',
-    content=message
-)
-
-run = client.beta.threads.runs.create(
-    thread_id=thread_id,
-    assistant_id=assistant_id,
-    instructions="Please address the user as James Bond", 
-)
-
-client.beta.assistants.delete(assistant_id='asst_YGQtM7ETpe6Cf19wwUiBaO6y')
-
-def wait_for_run_completion(client, thread_id, run_id, sleep_interval=5):
-    """
-
-    Waits for a run to complete and prints the elapsed time.:param client: The OpenAI client object.
-    :param thread_id: The ID of the thread.
-    :param run_id: The ID of the run.
-    :param sleep_interval: Time in seconds to wait between checks.
-    """
-    while True:
-        try:
-            run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
-            if run.completed_at:
-                elapsed_time = run.completed_at - run.created_at
-                formatted_elapsed_time = time.strftime(
-                    "%H:%M:%S", time.gmtime(elapsed_time)
-                )
-                print(f"Run completed in {formatted_elapsed_time}")
-                logging.info(f"Run completed in {formatted_elapsed_time}")
-                # Get messages here once Run is completed!
-                messages = client.beta.threads.messages.list(thread_id=thread_id)
-                last_message = messages.data[0]
-                response = last_message.content[0].text.value
-                print(f"Assistant Response: {response}")
-                break
-        except Exception as e:
-            logging.error(f"An error occurred while retrieving the run: {e}")
-            break
-        logging.info("Waiting for run to complete...")
-        time.sleep(sleep_interval)
-
-
-# === Run ===
-wait_for_run_completion(client=client, thread_id=thread_id, run_id=run.id)
-
-# ==== Steps --- Logs ==
-run_steps = client.beta.threads.runs.steps.list(thread_id=thread_id, run_id=run.id)
-print(f"Steps---> {run_steps.data[0]}")
