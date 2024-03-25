@@ -1,5 +1,6 @@
 import fitz  # PyMuPDF
 from act import ACTNode, NodeType
+from assistant import ACT_Assistant
 
 sample_filepath = '../../raw_data/sample_reports/s1-2022 (1)/45698120_Talha Islam_assignsubmission_file/45698120.pdf'
 
@@ -56,9 +57,17 @@ def extract_section_content(all_text, page_number, start_index, end_index):
 
     return clean_section_text(section_text)  # Apply cleaning
 
+def is_title(paragraph):
+    """Checks if a paragraph is likely a title."""
+    MAX_TITLE_WORDS = 10  # Adjust this limit as needed
+
+    words = paragraph.split()
+    return len(paragraph.splitlines()) == 1 and len(words) <= MAX_TITLE_WORDS and len(words) > 0
+
 def split_into_paragraphs(text):
     """Splits the text into a list of paragraphs."""
-    return text.split("\n \n") 
+    paragraphs = text.split("\n \n")
+    return [p.strip() for p in paragraphs if p.strip()]  # Remove empty paragraphs
 
 
 def build_act_tree(filepath: str):
@@ -111,10 +120,34 @@ def build_act_tree(filepath: str):
 
 
                 for paragraph_text in paragraphs:
-                    paragraph_node = ACTNode(0, paragraph_text[:5], NodeType.PARAGRAPH, paragraph_text, parent=node)
-                    paragraph_node.id = f"{node.id}.{subsection_id}"  
-                    subsection_id += 1 
+                    if is_title(paragraph_text):
+                        paragraph_node = ACTNode(0, paragraph_text, NodeType.TITLE, paragraph_text, parent=node)
+                    else:
+                        paragraph_node = ACTNode(0, paragraph_text[:5], NodeType.PARAGRAPH, paragraph_text, parent=node)
+                    # paragraph_node.id = f"{node.id}.{subsection_id}"  
+                    # subsection_id += 1 
+    
+    # Generating node goal for every paragraph node
+    # act_assitant = ACT_Assistant()
+    # count = 0
+    # for node in root.post_order_iter():
+    #     if count == 10:
+    #         break
+    #     if node.nodeType == NodeType.PARAGRAPH:
+    #         act_assitant.send_message("Paragraph:\n" + node.text)
+    #         node.goal = act_assitant.run_assistant()
+    #     elif node.nodeType == NodeType.TITLE:
+    #         node.goal = node.text
+    #     elif node.nodeType == NodeType.SECTION:
+    #         union_goal = ""
+    #         for child in node.children:
+    #             if child.goal:
+    #                 union_goal += child.goal
+    #         node.goal = union_goal    
+    #     count += 1
 
+    # Assign hierarchical IDs
+    root.assign_hierarchical_ids()
 
     return root
 
@@ -126,4 +159,5 @@ sample_act.visualize_tree()
 for node in sample_act.children[2].children[2].children:
     print(node.name, node.id, node.text)
 
+sample_act.export_json("sample_act.json")
 # print(sample_act.children[0].text)
