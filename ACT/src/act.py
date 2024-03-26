@@ -1,12 +1,13 @@
-from enum import Enum
-import networkx as nx
-import matplotlib.pyplot as plt
-from anytree import NodeMixin, RenderTree, AsciiStyle
-from anytree.exporter import UniqueDotExporter
+from enum import Enum, auto
+import fitz  # PyMuPDF
+from anytree import NodeMixin, RenderTree
 from anytree.iterators.levelorderiter import LevelOrderIter
 from anytree.iterators.postorderiter import PostOrderIter
-from anytree.exporter import JsonExporter
+from anytree.render import AsciiStyle
 from json import JSONEncoder
+
+from pdf_utls import extract_content_for_header, split_into_paragraphs, is_title
+from assistant import ACT_Assistant
 
 class NodeTypeEncoder(JSONEncoder):
     def default(self, obj):
@@ -21,11 +22,13 @@ class NodeType(Enum):
     IMAGE = "Image"
     TABLE = "Table"
     TITLE = "Title"
+    ROOT = "Root"
 
 
 
 class ACTNode(NodeMixin):
-    def __init__(self, id: str, name: str, nodeType, text, page=None, goal=None, parent=None, children=None, **kwargs):
+
+    def __init__(self, id: str, name: str, nodeType, text = None, page=None, goal=None, parent=None, children=None):
         if not isinstance(nodeType, NodeType):  # Ensure type is a NodeType
             raise TypeError("Node type must be a NodeType enum member")
         super(ACTNode, self).__init__()
@@ -36,14 +39,12 @@ class ACTNode(NodeMixin):
         self.goal = goal
         self.parent = parent
         self.page = page
-        self.children = []
+        if children:
+            self.children = children
 
     def print_tree(self, indent=0):
         for pre, fill, node in RenderTree(self):
-            print("%s%s" % (pre, node.id))
-
-    def visualize_tree(self):
-        UniqueDotExporter(self).to_picture("act_tree.png")
+            print("%s%s" % (pre, node.name))
     
     def level_order_iter(self):
         return LevelOrderIter(self)
@@ -60,80 +61,119 @@ class ACTNode(NodeMixin):
     def post_order_iter(self, **kwargs):
         return PostOrderIter(self, **kwargs)
     
+
+class ACTTree:  # New class to encapsulate structure logic
+    root: ACTNode
+
+    def __init__(self, filepath: str):
+        self.root = self._build_act_tree(filepath)
+        # Assign hierarchical IDs
+        self.assign_hierarchical_ids()
+
+    def _build_act_tree(self, filepath: str):
+        doc = fitz.open(filepath)
+
+        root = ACTNode(0, "Root", NodeType.ROOT)  # Create the root node
+        
+        section_stack = [root]  # Keep track of the current section at each level
+
+        section_id = 1  # Start with section ID 1
+        subsection_counters = {}  # A dictionary to track subsection IDs at each level
+
+        for entry in doc.get_toc():
+            level, title, page_number = entry
+
+            # Determine appropriate parent
+            while level <= len(section_stack) - 1:
+                section_stack.pop()  # Pop until we find the right parent level
+            parent = section_stack[-1]
+
+            # Create and append the node
+            node = ACTNode(level, title, NodeType.SECTION, None, parent=parent, page=page_number)
+            section_stack.append(node)
+
+        # Prepare headers from toc_data
+        headers = [(entry[1], entry[2]) for entry in doc.get_toc()]
+
+        sections = {}
+        for header in headers:
+            sections[header[0]] = extract_content_for_header(doc, headers, header[0])
+
+        # Content Association 
+        for node in root.level_order_iter():  
+            if node.nodeType in (NodeType.SECTION, NodeType.PARAGRAPH): 
+                node.text = sections.get(node.name, "") 
+
+        # Content Association with Paragraphs 
+        for node in root.level_order_iter():  
+            if node.nodeType == NodeType.SECTION: 
+                node.id = section_id  
+                section_id += 1 
+
+                subsection_id = subsection_counters.get(node.id, 0) + 1  # Get or initialize
+                subsection_counters[node.id] = subsection_id # Update the counter
+
+                if not node.children:
+                    paragraphs = split_into_paragraphs(node.text) 
+
+                    for paragraph_text in paragraphs:
+                        if is_title(paragraph_text):
+                            paragraph_node = ACTNode(0, paragraph_text, NodeType.TITLE, paragraph_text, parent=node)
+                        else:
+                            paragraph_node = ACTNode(0, paragraph_text[:5], NodeType.PARAGRAPH, paragraph_text, parent=node)
+        
+        
+        # Generating node goal for every paragraph node
+        # act_assistant = ACT_Assistant()
+        # count = 0
+        # for node in root.post_order_iter():
+        #     if count == 10:
+        #         break
+        #     if node.nodeType == NodeType.PARAGRAPH:
+        #         act_assistant.send_message("Paragraph:\n" + node.text)
+        #         node.goal = act_assistant.run_assistant()
+        #     elif node.nodeType == NodeType.TITLE:
+        #         node.goal = node.text
+        #     elif node.nodeType == NodeType.SECTION:
+        #         union_goal = ""
+        #         for child in node.children:
+        #             if child.goal:
+        #                 union_goal += child.goal
+        #         node.goal = union_goal    
+        #     count += 1
+
+
+
+        return root
+
+    def visualize_tree(self, file_path="act_tree.png"):
+        from anytree.exporter import UniqueDotExporter  # Import here for clarity
+        UniqueDotExporter(self.root).to_picture(file_path)
+
     def export_json(self, file_path):
+        from anytree.exporter import JsonExporter
+        # JSON Export is now independent of the Node class
         exporter = JsonExporter(indent=4, sort_keys=True, default=NodeTypeEncoder().default)
         with open(file_path, "w") as outfile:
-                exporter.write(self, outfile)
-        return exporter.export(self)
-    
+            exporter.write(self.root, outfile)
+
     def assign_hierarchical_ids(self):
         node_id = 0 
 
-        for pre, _, node in RenderTree(self, style=AsciiStyle()):
+        for pre, _, node in RenderTree(self.root, style=AsciiStyle()):
             if node.parent and node.parent.parent is None:
                 node_id += 1 
             node.id = node_id
-            print(f"Global node_id: {node_id}")
 
 
             if node.parent is not None:  
                 parent_depth = len(str(node.parent.id).split("."))
                 subsection_id = 1 
-                print(f"Node: {node.id}, Parent: {node.parent.id}")  # Added
                 for sibling in node.parent.children:
                     if sibling == node and node.parent.parent is not None:  
                         node.id = f"{node.parent.id}.{subsection_id}"
-                        print(f"Formatted ID: {node.id}") 
                         break
                     subsection_id += 1 
-
-
-
-
-
-
-
-def print_act_tree(node, indent=0):
-    print("  " * indent + f"({node.id}) {node.type}: {node.text} - Goal: {node.goal}")
-    for child in node.children:
-        print_act_tree(child, indent + 1)
-        
-
-    # def Constructing_Answer_based_Tree(answer):
-
-
-#     root = ACTNode(0, "Root", None)  # Create the root node
-#     current_section = None
-
-#     for element in answer:
-#         if element.type == "Section":
-#             current_section = ACTNode(element.id, "Section", element.text)
-#             root.add_child(current_section) 
-#         elif element.type == "Paragraph" or element.type == "Caption":
-#             node = ACTNode(element.id, element.type, element.text)
-#             if element.type == "Paragraph":
-#                 node.goal = LLM_Pragraph_Main_Goal(element.text)  
-#             else:  # element.type == "Caption"
-#                 node.goal = summarize_caption(element.text)  # Replace with your summarization logic
-#             current_section.add_child(node)  
-
-#     return root 
-
-
-def visualize_act_tree(root):
-    G = nx.DiGraph()  # Directed graph for the hierarchy 
-
-    def add_nodes(node):
-        G.add_node(node.id, type=node.type, text=node.text)
-        for child in node.children:
-            G.add_edge(node.id, child.id)
-            add_nodes(child)
-
-    add_nodes(root)
-
-    # Customize visualization (optional)
-    node_labels = nx.get_node_attributes(G, 'text')
-    pos = nx.spring_layout(G)  # Or other layout algorithms
-
-    nx.draw(G, pos, with_labels=True, labels=node_labels)
-    plt.show()
+    
+    def print_tree(self):
+        self.root.print_tree()
