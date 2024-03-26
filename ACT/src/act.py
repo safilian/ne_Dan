@@ -5,6 +5,7 @@ from anytree.iterators.levelorderiter import LevelOrderIter
 from anytree.iterators.postorderiter import PostOrderIter
 from anytree.render import AsciiStyle
 from json import JSONEncoder
+import json
 
 from pdf_utls import extract_content_for_header, split_into_paragraphs, is_title
 from assistant import ACT_Assistant
@@ -28,7 +29,7 @@ class NodeType(Enum):
 
 class ACTNode(NodeMixin):
 
-    def __init__(self, id: str, name: str, nodeType, text = None, page=None, goal=None, parent=None, children=None):
+    def __init__(self, id: str, name: str, nodeType, text = None, page=None, goal=None, parent=None, children=None, thread_id = None):
         if not isinstance(nodeType, NodeType):  # Ensure type is a NodeType
             raise TypeError("Node type must be a NodeType enum member")
         super(ACTNode, self).__init__()
@@ -41,10 +42,14 @@ class ACTNode(NodeMixin):
         self.page = page
         if children:
             self.children = children
+        thread_id = thread_id
 
     def print_tree(self, indent=0):
+        output = ''
         for pre, fill, node in RenderTree(self):
             print("%s%s" % (pre, node.name))
+            output += "%s%s\n" % (pre, node.name)
+        return output
     
     def level_order_iter(self):
         return LevelOrderIter(self)
@@ -122,28 +127,6 @@ class ACTTree:  # New class to encapsulate structure logic
                         else:
                             paragraph_node = ACTNode(0, paragraph_text[:5], NodeType.PARAGRAPH, paragraph_text, parent=node)
         
-        
-        # Generating node goal for every paragraph node
-        # act_assistant = ACT_Assistant()
-        # count = 0
-        # for node in root.post_order_iter():
-        #     if count == 10:
-        #         break
-        #     if node.nodeType == NodeType.PARAGRAPH:
-        #         act_assistant.send_message("Paragraph:\n" + node.text)
-        #         node.goal = act_assistant.run_assistant()
-        #     elif node.nodeType == NodeType.TITLE:
-        #         node.goal = node.text
-        #     elif node.nodeType == NodeType.SECTION:
-        #         union_goal = ""
-        #         for child in node.children:
-        #             if child.goal:
-        #                 union_goal += child.goal
-        #         node.goal = union_goal    
-        #     count += 1
-
-
-
         return root
 
     def visualize_tree(self, file_path="act_tree.png"):
@@ -156,6 +139,7 @@ class ACTTree:  # New class to encapsulate structure logic
         exporter = JsonExporter(indent=4, sort_keys=True, default=NodeTypeEncoder().default)
         with open(file_path, "w") as outfile:
             exporter.write(self.root, outfile)
+        return json.dumps(self.root, cls==NodeTypeEncoder().default)
 
     def assign_hierarchical_ids(self):
         node_id = 0 
@@ -177,3 +161,26 @@ class ACTTree:  # New class to encapsulate structure logic
     
     def print_tree(self):
         self.root.print_tree()
+
+    def generate_goal(self):
+        if self.root.thread_id:
+            act_assistant = ACT_Assistant(self.root.thread_id)
+        # Generating node goal for every paragraph node
+        else:
+            act_assistant = ACT_Assistant()
+        count = 0
+        for node in self.root.post_order_iter():
+            if count == 10:
+                break
+            if node.nodeType == NodeType.PARAGRAPH:
+                act_assistant.send_message("Paragraph:\n" + node.text)
+                node.goal = act_assistant.run_assistant_single_paragraph()
+            elif node.nodeType == NodeType.TITLE:
+                node.goal = node.text
+            elif node.nodeType == NodeType.SECTION:
+                union_goal = ""
+                for child in node.children:
+                    if child.goal:
+                        union_goal += child.goal
+                node.goal = union_goal    
+            count += 1
