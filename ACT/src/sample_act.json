@@ -972,7 +972,7 @@
     "goal": null,
     "id": 0,
     "name": "Root",
-    "nodeType": "Section",
+    "nodeType": "Root",
     "page": null,
-    "text": ""
+    "text": null
 }

@@ -18,21 +18,19 @@ def save_to_env_file(key, value):
 
 # === Create Assistant ===
 class ACT_Assistant:
-    def __init__(self):
+    def __init__(self, assistant_id=None, thread_id=None):
         ASSISTANT_ID = os.getenv("ASSISTANT_ID")
-        THREAD_ID = os.getenv("THREAD_ID") 
 
         if not ASSISTANT_ID:
             ASSISTANT_ID = self.create_assistant()
             save_to_env_file("ASSISTANT_ID", ASSISTANT_ID)  
 
-        if not THREAD_ID:
-            THREAD_ID = self.create_thread("Hello, I have a paragraph that I would like to summarize.")
-            save_to_env_file("THREAD_ID", THREAD_ID)
+        if not thread_id:
+            thread_id = self.create_thread("Hello, I have a paragraph that I would like to summarize.")
 
         
         self.assistant_id = ASSISTANT_ID
-        self.thread_id = THREAD_ID
+        self.thread_id = thread_id
 
     def create_assistant(self):
         assistant = client.beta.assistants.create(
@@ -58,10 +56,9 @@ class ACT_Assistant:
                 }
             ]
         )
-        THREAD_ID = thread.id
-        print(f"Thread created with ID: {THREAD_ID}")
+        print(f"Thread created with ID: {thread.id}")
 
-        self.thread_id = THREAD_ID
+        self.thread_id = thread.id
         return self.thread_id
 
     def send_message(self, message):
@@ -72,7 +69,7 @@ class ACT_Assistant:
         )
         print(f"Message sent: {message.content}")
 
-    def run_assistant(self):
+    def run_assistant_single_paragraph(self):
         run = client.beta.threads.runs.create(
             thread_id=self.thread_id,
             assistant_id=self.assistant_id,
@@ -140,5 +137,5 @@ class ACT_Assistant:
 # experiencing their theoretical concepts.
 # """
 # assistant.send_message("Paragraph:\n" + SAMPLE_PARAGRAPH)
-# assistant.run_assistant()
+# assistant.run_assistant_single_paragraph()
 
