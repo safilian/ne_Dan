@@ -56,12 +56,12 @@ Constructing_Answer_based_Tree(ACT, Answer) {
    On MacOs:
    * Export the key as an environment variable `OPENAI_API_KEY`:
      ```bash
-     cd ACT/src
      export OPENAI_API_KEY=your_api_key 
      ```
 
 ### 4. Run the Flask API:
    ```bash
+   cd ACT/src
    flask --app act_api run --debug
    ```
 
