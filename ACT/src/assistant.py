@@ -9,7 +9,7 @@ from torch import save
 load_dotenv()  # Load environment variables
 
 client = OpenAI()
-model = 'gpt-3.5-turbo'
+model = 'gpt-4-0125-preview'
 
 
 def save_to_env_file(key, value):
