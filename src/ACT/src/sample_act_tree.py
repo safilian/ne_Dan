@@ -1,20 +1,20 @@
-from random import sample
-from act import ACTNode, NodeType, ACTTree
-from assistant import ACT_Assistant
+from .act import ACTTree
+from pathlib import Path
 
-sample_filepath = '../../raw_data/sample_reports/s1-2022 (1)/45698120_Talha Islam_assignsubmission_file/45698120.pdf'
-
-
+sample_filepath = (
+    Path(__file__).parent.parent.parent.parent
+    / "data/raw/sample_reports/s1-2022 (1)/45698120_Talha Islam_assignsubmission_file/45698120.pdf"
+)
 
 
 sample_act = ACTTree(sample_filepath)
 sample_act.print_tree()
-sample_act.visualize_tree()
+# sample_act.visualize_tree()
 
 for node in sample_act.root.root.children[2].children[2].children:
     print(node.name, node.id, node.text)
 
-sample_act.export_json("sample_act.json")
+# sample_act.export_json("sample_act.json")
 print(sample_act.root.children[0].text)
 
 # sample_node3 = ACTNode(0, "This is a sample section", NodeType.SECTION, "This is a sample section")
