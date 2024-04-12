@@ -12,7 +12,7 @@ This folder contains the files and resources related to the ACT (Answer_based_Tr
 - Text
 - Goal
 
-#### Node Type: 
+#### Node Type:
 - Paragraph
 - Section
 - Root
@@ -56,20 +56,19 @@ Constructing_Answer_based_Tree(ACT, Answer) {
    On MacOs:
    * Export the key as an environment variable `OPENAI_API_KEY`:
      ```bash
-     export OPENAI_API_KEY=your_api_key 
+     export OPENAI_API_KEY=your_api_key
      ```
 
 ### 4. Run the Flask API:
    ```bash
-   cd ACT/src
-   flask --app act_api run --debug
+   python3 -m src.ACT.src.act_api
    ```
 
 ### 5. Access the API in your browser:
 
 1. **Open your web browser** (e.g., Chrome, Firefox, Safari).
 
-2. **In the address bar, type:** 
+2. **In the address bar, type:**
    ```
    http://127.0.0.1:5000/build-act
    ```
@@ -120,5 +119,3 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Contact
 For any questions or suggestions, please feel free to reach out to us at [dannguyen0801@gmail.com](dannguyen0801@gmail.com).
-   
-   

@@ -17,9 +17,12 @@ Thumbs.db
 .venv/
 
 # ignore large data files
-/raw_data/
-/processed_data/
+/data/
 /uploads/
 
 # ignore environment files
 *.env
+
+# ignore build files
+*.log
+*.out

@@ -16,18 +16,20 @@ def save_to_env_file(key, value):
         f.write(f"{key}={value}\n")
 
 # === Create Assistant ===
+
+
 class ACT_Assistant:
     def __init__(self, assistant_id=None, thread_id=None):
         ASSISTANT_ID = os.getenv("ASSISTANT_ID")
 
         if not ASSISTANT_ID:
             ASSISTANT_ID = self.create_assistant()
-            save_to_env_file("ASSISTANT_ID", ASSISTANT_ID)  
+            save_to_env_file("ASSISTANT_ID", ASSISTANT_ID)
 
         if not thread_id:
-            thread_id = self.create_thread("Hello, I have a paragraph that I would like to summarize.")
+            thread_id = self.create_thread(
+                "Hello, I have a paragraph that I would like to summarize.")
 
-        
         self.assistant_id = ASSISTANT_ID
         self.thread_id = thread_id
 
@@ -43,7 +45,7 @@ class ACT_Assistant:
         ASSISTANT_ID = assistant.id
         print(f"Assistant created with ID: {ASSISTANT_ID}")
 
-        self.assistant_id = ASSISTANT_ID  
+        self.assistant_id = ASSISTANT_ID
         return self.assistant_id
 
     def create_thread(self, user_message):
@@ -51,7 +53,7 @@ class ACT_Assistant:
             messages=[
                 {
                     'role': 'user',
-                        'content': user_message
+                    'content': user_message
                 }
             ]
         )
@@ -82,14 +84,16 @@ class ACT_Assistant:
         retries = 0
         while retries < max_retries:
             try:
-                run = client.beta.threads.runs.retrieve(thread_id=self.thread_id, run_id=run_id)
+                run = client.beta.threads.runs.retrieve(
+                    thread_id=self.thread_id, run_id=run_id)
                 if run.completed_at:
                     elapsed_time = run.completed_at - run.created_at
                     formatted_elapsed_time = time.strftime(
                         "%H:%M:%S", time.gmtime(elapsed_time)
                     )
                     print(f"Run completed in {formatted_elapsed_time}")
-                    messages = client.beta.threads.messages.list(thread_id=self.thread_id)
+                    messages = client.beta.threads.messages.list(
+                        thread_id=self.thread_id)
                     last_message = messages.data[0]
                     response = last_message.content[0].text.value
                     print(f"Assistant Response: {response}")
@@ -107,7 +111,7 @@ class ACT_Assistant:
         else:
             print("Maximum retries exceeded. Terminating the run.")
             self.delete_thread_by_id(self.thread_id)
-        
+
         def delete_thread_by_id(self, thread_id):
             client.beta.threads.delete(thread_id=thread_id)
             print(f"Thread {thread_id} deleted")
@@ -137,4 +141,3 @@ class ACT_Assistant:
 # """
 # assistant.send_message("Paragraph:\n" + SAMPLE_PARAGRAPH)
 # assistant.run_assistant_single_paragraph()
-
