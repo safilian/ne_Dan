@@ -1,124 +1,54 @@
-from email import message
-from venv import create
-from openai import OpenAI
-import time
 import os
 from dotenv import load_dotenv
 
+from GPT_assistant.base_assistant import BaseAssistant
+from log.log import Log
+from utilities.utils import save_to_env_file
+
 load_dotenv()  # Load environment variables
 
-client = OpenAI()
-model = 'gpt-4-0125-preview'
-
-
-def save_to_env_file(key, value):
-    with open(".env", "a") as f:  # Append mode
-        f.write(f"{key}={value}\n")
-
+ACT_MODEL = "gpt-4-0125-preview"
+ACT_MODEL_NAME = "ACT_ASSISTANT"
+ACT_MODEL_ID = f"{ACT_MODEL_NAME}_ID"
+ACT_THREAD_ID = f"{ACT_MODEL_NAME}_THREAD_ID"
 # === Create Assistant ===
 
 
-class ACT_Assistant:
+class ACT_Assistant(BaseAssistant):
+    ASSISTANT_INSTRUCTIONS = "Please extract the main goal or abstractive summary of a text for a paragraph node"
+    CREATE_THREAD_MESSAGE = "Hello, I have a paragraph that I would like to summarize."
+    SINGLE_PARAGRAPH_GOAL = """Please extract the main goal or abstractive summary of a text for a paragraph node,
+            main goal need to cover all concept mention in the text. Please provide the goal in less than 3 bullet points."""
+
     def __init__(self, assistant_id=None, thread_id=None):
-        ASSISTANT_ID = os.getenv("ASSISTANT_ID")
+        logger = Log("ACT_Assistant", "act_assistant.log")
+        super().__init__(ACT_MODEL_NAME, assistant_id, thread_id, logger)
 
-        if not ASSISTANT_ID:
-            ASSISTANT_ID = self.create_assistant()
-            save_to_env_file("ASSISTANT_ID", ASSISTANT_ID)
+        ASSISTANT_ID = os.getenv(ACT_MODEL_ID)
+        THREAD_ID = os.getenv(ACT_THREAD_ID)
 
-        if not thread_id:
-            thread_id = self.create_thread(
-                "Hello, I have a paragraph that I would like to summarize.")
+        if not ASSISTANT_ID and not assistant_id:
+            ASSISTANT_ID = self.create_assistant(
+                ACT_MODEL_NAME, self.ASSISTANT_INSTRUCTIONS, ACT_MODEL
+            )
+            save_to_env_file(ACT_MODEL_ID, ASSISTANT_ID)
 
-        self.assistant_id = ASSISTANT_ID
-        self.thread_id = thread_id
+        if not THREAD_ID and not thread_id:
+            THREAD_ID = self.create_thread(self.CREATE_THREAD_MESSAGE)
+            save_to_env_file(ACT_THREAD_ID, THREAD_ID)
 
-    def create_assistant(self):
-        assistant = client.beta.assistants.create(
-            name="Paragraph Summary Assistant",
-            instructions="""
-            You are an assistant speacialised in summarizing paragraphs.
-            }
-            """,
-            model=model
-        )
-        ASSISTANT_ID = assistant.id
-        print(f"Assistant created with ID: {ASSISTANT_ID}")
-
-        self.assistant_id = ASSISTANT_ID
-        return self.assistant_id
-
-    def create_thread(self, user_message):
-        thread = client.beta.threads.create(
-            messages=[
-                {
-                    'role': 'user',
-                    'content': user_message
-                }
-            ]
-        )
-        print(f"Thread created with ID: {thread.id}")
-
-        self.thread_id = thread.id
-        return self.thread_id
-
-    def send_message(self, message):
-        message = client.beta.threads.messages.create(
-            thread_id=self.thread_id,
-            role='user',
-            content=message
-        )
-        print(f"Message sent: {message.content}")
+        self.assistant_id = ASSISTANT_ID or assistant_id
+        self.thread_id = THREAD_ID or thread_id
 
     def run_assistant_single_paragraph(self):
-        run = client.beta.threads.runs.create(
+        run = self.client.beta.threads.runs.create(
             thread_id=self.thread_id,
             assistant_id=self.assistant_id,
-            instructions="""Please extract the main goal or abstractive summary of a text for a paragraph node, 
-            main goal need to cover all concept mention in the text. Please provide the goal in less than 3 bullet points.""",
+            instructions=self.SINGLE_PARAGRAPH_GOAL,
         )
-        print(f"Assistant run created with ID: {run.id}")
+        self.logger.info(f"Assistant run created with ID: {run.id}")
         return self.wait_for_run_completion(run.id)
 
-    def wait_for_run_completion(self, run_id, sleep_interval=5, max_retries=3):
-        retries = 0
-        while retries < max_retries:
-            try:
-                run = client.beta.threads.runs.retrieve(
-                    thread_id=self.thread_id, run_id=run_id)
-                if run.completed_at:
-                    elapsed_time = run.completed_at - run.created_at
-                    formatted_elapsed_time = time.strftime(
-                        "%H:%M:%S", time.gmtime(elapsed_time)
-                    )
-                    print(f"Run completed in {formatted_elapsed_time}")
-                    messages = client.beta.threads.messages.list(
-                        thread_id=self.thread_id)
-                    last_message = messages.data[0]
-                    response = last_message.content[0].text.value
-                    print(f"Assistant Response: {response}")
-                    return response
-            except Exception as e:
-                print(f"An error occurred while retrieving the run: {e}")
-                retries += 1
-                if retries < max_retries:
-                    print(f"Retrying in {sleep_interval} seconds...")
-                    time.sleep(sleep_interval)
-                else:
-                    print("Maximum retries exceeded. Terminating the run.")
-                    # self.delete_thread_by_id(self.thread_id)
-                    return None
-        else:
-            print("Maximum retries exceeded. Terminating the run.")
-            self.delete_thread_by_id(self.thread_id)
-
-        def delete_thread_by_id(self, thread_id):
-            client.beta.threads.delete(thread_id=thread_id)
-            print(f"Thread {thread_id} deleted")
-
-        def list_all_threads(self):
-            threads = client.beta.threads.list()
-            print(f"Threads: {threads}")
 
 # assistant = ACT_Assistant()
 
@@ -139,5 +69,5 @@ class ACT_Assistant:
 # experience to learn on cisco technologies for networking students is a great way of
 # experiencing their theoretical concepts.
 # """
-# assistant.send_message("Paragraph:\n" + SAMPLE_PARAGRAPH)
+# assistant.add_message_to_thread("Paragraph:\n" + SAMPLE_PARAGRAPH)
 # assistant.run_assistant_single_paragraph()
