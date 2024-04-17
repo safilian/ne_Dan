@@ -84,6 +84,7 @@ class ACTTree:  # New class to encapsulate structure logic
         self.root = self._build_act_tree(filepath)
         # Assign hierarchical IDs
         self.assign_hierarchical_ids()
+        # self.generate_goal()
 
     def _build_act_tree(self, filepath: str):
         doc = fitz.open(filepath)
@@ -193,17 +194,13 @@ class ACTTree:  # New class to encapsulate structure logic
         self.root.print_tree()
 
     def generate_goal(self):
-        if hasattr(self.root, "thread_id"):
-            act_assistant = ACT_Assistant(self.root.thread_id)
-        # Generating node goal for every paragraph node
-        else:
-            act_assistant = ACT_Assistant()
+        act_assistant = ACT_Assistant()
         count = 0
         for node in self.root.post_order_iter():
             if count == 10:
                 break
             if node.nodeType == NodeType.PARAGRAPH:
-                act_assistant.send_message("Paragraph:\n" + node.text)
+                act_assistant.add_message_to_thread("Paragraph:\n" + node.text)
                 node.goal = act_assistant.run_assistant_single_paragraph()
             elif node.nodeType == NodeType.TITLE:
                 node.goal = node.text
