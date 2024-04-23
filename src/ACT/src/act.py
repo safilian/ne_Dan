@@ -1,4 +1,5 @@
 from enum import Enum
+from pathlib import Path
 import fitz  # PyMuPDF
 from anytree import NodeMixin, RenderTree
 from anytree.iterators.levelorderiter import LevelOrderIter
@@ -6,8 +7,16 @@ from anytree.iterators.postorderiter import PostOrderIter
 from anytree.render import AsciiStyle
 from json import JSONEncoder
 
+from redis import Redis
+from rq import Queue
+
+from .act_jobs import process_paragraph_job
+from log.log import Log
+
 from .pdf_utls import extract_content_for_header, split_into_paragraphs, is_title
-from .assistant import ACT_Assistant
+from .assistant import ACTAssistant
+
+logger = Log("act", "act.log")
 
 
 class NodeTypeEncoder(JSONEncoder):
@@ -76,20 +85,29 @@ class ACTNode(NodeMixin):
     def post_order_iter(self, **kwargs):
         return PostOrderIter(self, **kwargs)
 
+    def __str__(self):
+        return f"Node(name={self.name}, type={self.nodeType}, id={self.id}),\n goal={self.goal},\n text={self.text}, page={self.page}"
+
 
 class ACTTree:  # New class to encapsulate structure logic
-    root: ACTNode
-
-    def __init__(self, filepath: str):
-        self.root = self._build_act_tree(filepath)
-        # Assign hierarchical IDs
-        self.assign_hierarchical_ids()
-        # self.generate_goal()
+    def __init__(self, filepath: Path):
+        # Check if the file is a pdf file
+        if filepath.with_suffix(".pdf"):
+            self.root = self._build_act_tree(filepath)
+            # Assign hierarchical IDs
+            self.assign_hierarchical_ids()
+            # self.generate_goal()
+        elif filepath.with_suffix(".json"):
+            self.import_json(filepath)
+        else:
+            raise ValueError(
+                "Invalid file type. Only PDF and JSON files are supported."
+            )
 
     def _build_act_tree(self, filepath: str):
         doc = fitz.open(filepath)
 
-        root = ACTNode(0, "Root", NodeType.ROOT)  # Create the root node
+        root = ACTNode(0, filepath.name, NodeType.ROOT)  # Create the root node
 
         # Keep track of the current section at each level
         section_stack = [root]
@@ -173,6 +191,37 @@ class ACTTree:  # New class to encapsulate structure logic
         with open(file_path, "w") as outfile:
             exporter.write(self.root, outfile)
 
+    def import_json(self, file_path):
+        from anytree.importer import JsonImporter
+
+        importer = JsonImporter()
+
+        with open(file_path, "r") as infile:
+            tree_data = importer.read(infile)
+
+        def create_node(node_data):
+            return ACTNode(
+                name=node_data.name,
+                nodeType=NodeType[
+                    node_data.nodeType.upper()
+                ],  # Convert string to NodeType
+                id=node_data.id,
+                page=node_data.page,
+                text=node_data.text,
+                goal=node_data.goal,
+            )
+
+        self.root = create_node(tree_data)  # Create the root node
+
+        # Recursively create children
+        def build_tree(parent_node, data):
+            for child_data in data.children:
+                child_node = create_node(child_data)
+                child_node.parent = parent_node
+                build_tree(child_node, child_data)  # Recursion
+
+        build_tree(self.root, tree_data)
+
     def assign_hierarchical_ids(self):
         node_id = 0
 
@@ -194,7 +243,7 @@ class ACTTree:  # New class to encapsulate structure logic
         self.root.print_tree()
 
     def generate_goal(self):
-        act_assistant = ACT_Assistant()
+        act_assistant = ACTAssistant()
         count = 0
         for node in self.root.post_order_iter():
             if count == 10:
@@ -202,6 +251,23 @@ class ACTTree:  # New class to encapsulate structure logic
             if node.nodeType == NodeType.PARAGRAPH:
                 act_assistant.add_message_to_thread("Paragraph:\n" + node.text)
                 node.goal = act_assistant.run_assistant_single_paragraph()
+            elif node.nodeType == NodeType.TITLE:
+                node.goal = node.text
+            elif node.nodeType == NodeType.SECTION:
+                union_goal = ""
+                for child in node.children:
+                    if child.goal:
+                        union_goal += child.goal
+                node.goal = union_goal
+            count += 1
+
+    def generate_goal_job(self):
+        queue = Queue(connection=Redis())
+
+        count = 0
+        for node in self.root.post_order_iter():
+            if node.nodeType == NodeType.PARAGRAPH:
+                job = queue.enqueue(process_paragraph_job, node.text)
             elif node.nodeType == NodeType.TITLE:
                 node.goal = node.text
             elif node.nodeType == NodeType.SECTION:

@@ -37,6 +37,7 @@ def upload_file():
             save_path = Path(app.config["UPLOAD_FOLDER"]) / "act" / filename
             file.save(save_path)
             act_tree = ACTTree(save_path)
+            # act_tree.generate_goal_job()
             return act_tree.root.print_tree()
     return """
     <!doctype html>
