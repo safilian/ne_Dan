@@ -14,7 +14,7 @@ ACT_THREAD_ID = f"{ACT_MODEL_NAME}_THREAD_ID"
 # === Create Assistant ===
 
 
-class ACT_Assistant(BaseAssistant):
+class ACTAssistant(BaseAssistant):
     ASSISTANT_INSTRUCTIONS = "Please extract the main goal or abstractive summary of a text for a paragraph node"
     CREATE_THREAD_MESSAGE = "Hello, I have a paragraph that I would like to summarize."
     SINGLE_PARAGRAPH_GOAL = """Please extract the main goal or abstractive summary of a text for a paragraph node,
@@ -40,11 +40,11 @@ class ACT_Assistant(BaseAssistant):
         self.assistant_id = ASSISTANT_ID or assistant_id
         self.thread_id = THREAD_ID or thread_id
 
-    def run_assistant_single_paragraph(self):
+    def run_assistant_single_paragraph(self, instructions=None):
         run = self.client.beta.threads.runs.create(
             thread_id=self.thread_id,
             assistant_id=self.assistant_id,
-            instructions=self.SINGLE_PARAGRAPH_GOAL,
+            instructions=instructions or self.SINGLE_PARAGRAPH_GOAL,
         )
         self.logger.info(f"Assistant run created with ID: {run.id}")
         return self.wait_for_run_completion(run.id)

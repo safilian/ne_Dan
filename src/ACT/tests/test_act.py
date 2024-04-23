@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 from pathlib import Path
 import json
 
-from ACT.src.act import NodeType, ACTTree, ACT_Assistant
+from ACT.src.act import NodeType, ACTTree, ACTAssistant
 from ACT.tests.mock import SAMPLE_FILEPATH, JSON_FILE_PATH
 
 
@@ -19,7 +19,7 @@ def basic_act_tree():
 
 def test_build_act_tree(basic_act_tree):  # Example using a fixture
     root = basic_act_tree.root
-    assert root.name == "Root"
+    assert root.name == SAMPLE_FILEPATH.name
     assert root.nodeType == NodeType.ROOT
     assert len(root.children) > 0  # Assuming a non-empty document
 
@@ -38,12 +38,12 @@ def test_build_act_tree_subsections(basic_act_tree):
 
 def test_generate_goal(basic_act_tree):
 
-    # Create mock ACT_Assistant class and configure methods
-    mock_assistant = MagicMock(spec=ACT_Assistant)
+    # Create mock ACTAssistant class and configure methods
+    mock_assistant = MagicMock(spec=ACTAssistant)
     mocked_paragraph_goal = "Mocked paragraph goal"
     mock_assistant.run_assistant_single_paragraph.return_value = mocked_paragraph_goal
 
-    with patch("ACT.src.act.ACT_Assistant", return_value=mock_assistant):
+    with patch("ACT.src.act.ACTAssistant", return_value=mock_assistant):
         act_tree = basic_act_tree
         act_tree.generate_goal()
 
@@ -83,5 +83,5 @@ def test_export_json(basic_act_tree):
 
     # Optionally, load the JSON file and validate its contents
     json_data = json.load(open(JSON_FILE_PATH))
-    assert json_data["name"] == "Root"
+    assert json_data["name"] == SAMPLE_FILEPATH.name
     assert json_data["children"][0]["name"] == "ACKNOWLEDGEMENT"

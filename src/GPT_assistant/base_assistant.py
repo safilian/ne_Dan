@@ -1,6 +1,7 @@
 from openai import OpenAI
 import time
 from dotenv import load_dotenv
+import openai
 from log.log import Log
 
 logger = Log("BaseAssistant", "base_assistant.log")
@@ -98,8 +99,15 @@ class BaseAssistant:
     def run_assistant(self):
         pass
 
+    def add_example_to_thread(self, example_input: str, example_output: str):
+        self.add_message_to_thread(
+            f"For example: **Input:**\n\n{example_input}\n\n**Output:**\n\n{example_output}"
+        )
+
     def wait_for_run_completion(
-        self, run_id, sleep_interval=5, max_retries=3, timeout=10
+        self,
+        run_id,
+        sleep_interval=1,
     ):
         """
         Waits for the completion of a run.
@@ -114,31 +122,26 @@ class BaseAssistant:
             str: The response from the assistant.
 
         """
-        retries = 0
-        while retries < max_retries:
-            try:
-                run = self.client.beta.threads.runs.retrieve(
-                    thread_id=self.thread_id, run_id=run_id, timeout=timeout
-                )
-                if run.completed_at:
-                    elapsed_time = run.completed_at - run.created_at
-                    formatted_elapsed_time = time.strftime(
-                        "%H:%M:%S", time.gmtime(elapsed_time)
-                    )
-                    self.logger.info(f"Run completed in {formatted_elapsed_time}")
-                    messages = self.client.beta.threads.messages.list(
-                        thread_id=self.thread_id
-                    )
-                    last_message = messages.data[0]
-                    response = last_message.content[0].text.value
-                    self.logger.info(f"Assistant Response: {response}")
-                    return response
-            except Exception as e:
-                self.logger.error(f"An error occurred while retrieving the run: {e}")
-                retries += 1
-                if retries < max_retries:
-                    self.logger.info(f"Retrying in {sleep_interval} seconds...")
-                    time.sleep(sleep_interval)
-                else:
-                    self.logger.error("Maximum retries exceeded. Terminating the run.")
-                    return None
+        run = self.client.beta.threads.runs.retrieve(
+            thread_id=self.thread_id, run_id=run_id
+        )
+        while run.status in ["in_progress", "queued"]:
+            time.sleep(sleep_interval)
+            run = self.client.beta.threads.runs.retrieve(
+                thread_id=self.thread_id, run_id=run.id
+            )
+
+        if run.status == "completed":
+            elapsed_time = run.completed_at - run.created_at
+            formatted_elapsed_time = time.strftime(
+                "%H:%M:%S", time.gmtime(elapsed_time)
+            )
+            self.logger.info(f"Run {run_id} completed in {formatted_elapsed_time}")
+            messages = self.client.beta.threads.messages.list(thread_id=self.thread_id)
+            last_message = messages.data[0]
+            response = last_message.content[0].text.value
+            self.logger.info(f"Assistant Response: {response}")
+            return response
+        else:
+            self.logger.error(f"Run {run_id} failed with error: {run.last_error}")
+            raise RuntimeError("Assistant run failed.")

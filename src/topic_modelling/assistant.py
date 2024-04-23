@@ -51,19 +51,14 @@ class TM_Assistant(BaseAssistant):
         self.assistant_id = ASSISTANT_ID or assistant_id
         self.thread_id = THREAD_ID or thread_id
 
-    def run_assistant_single_text(self):
+    def run_assistant_single_text(self, instructions=None):
         run = self.client.beta.threads.runs.create(
             thread_id=self.thread_id,
             assistant_id=self.assistant_id,
-            instructions=self.SINGLE_TASK,
+            instructions=instructions or self.SINGLE_TASK,
         )
         self.logger.info(f"Assistant run created with ID: {run.id}")
         return self.wait_for_run_completion(run.id)
-
-    def add_example_to_thread(self, example_input: str, example_output: str):
-        self.add_message_to_thread(
-            f"{self.EXAMPLE_MESSAGE}**Input:**\n\n{example_input}\n\n**Output:**\n\n{example_output}"
-        )
 
     def add_example_by_batching(self, examples: list):
         for example in examples:

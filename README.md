@@ -25,8 +25,15 @@ Yirigaa_NLP is a repository for my major project on Natural Language Processing.
      export OPENAI_API_KEY=your_api_key
      ```
 
-### 4. Build the project
+### 4. Build the project:
 
 ```bash
 pip install -e .
+```
+
+### 5. Run Redis and RQ Worker:
+
+```bash
+redis-server
+rq worker --with-scheduler
 ```

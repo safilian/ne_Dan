@@ -26,3 +26,6 @@ Thumbs.db
 # ignore build files
 *.log
 *.out
+
+# ignore database files
+*.rdb
