@@ -8,7 +8,7 @@ logger = Log("BaseAssistant", "base_assistant.log")
 
 load_dotenv()  # Load environment variables
 
-DEFAULT_MODEL = "gpt-4-0125-preview"
+DEFAULT_MODEL = "gpt-3.5-turbo-0125"
 
 
 class BaseAssistant:

@@ -7,7 +7,7 @@ from utilities.utils import save_to_env_file
 
 load_dotenv()  # Load environment variables
 
-ACT_MODEL = "gpt-4-0125-preview"
+ACT_MODEL = "gpt-3.5-turbo-0125"
 ACT_MODEL_NAME = "ACT_ASSISTANT"
 ACT_MODEL_ID = f"{ACT_MODEL_NAME}_ID"
 ACT_THREAD_ID = f"{ACT_MODEL_NAME}_THREAD_ID"
