@@ -41,7 +41,7 @@ def test_generate_goal(basic_act_tree):
     # Create mock ACTAssistant class and configure methods
     mock_assistant = MagicMock(spec=ACTAssistant)
     mocked_paragraph_goal = "Mocked paragraph goal"
-    mock_assistant.run_assistant_single_paragraph.return_value = mocked_paragraph_goal
+    mock_assistant.run_assistant_single_time.return_value = mocked_paragraph_goal
 
     with patch("ACT.src.act.ACTAssistant", return_value=mock_assistant):
         act_tree = basic_act_tree

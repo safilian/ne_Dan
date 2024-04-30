@@ -249,7 +249,7 @@ class ACTTree:  # New class to encapsulate structure logic
                 break
             if node.nodeType == NodeType.PARAGRAPH:
                 act_assistant.add_message_to_thread("Paragraph:\n" + node.text)
-                node.goal = act_assistant.run_assistant_single_paragraph()
+                node.goal = act_assistant.run_assistant_single_time()
             elif node.nodeType == NodeType.TITLE:
                 node.goal = node.text
             elif node.nodeType == NodeType.SECTION:
@@ -325,5 +325,5 @@ def generate_goal_job(export_path: Path):
 def process_paragraph_job(node_text):
     act_assistant = ACTAssistant()
     act_assistant.add_message_to_thread("Paragraph:\n" + node_text)
-    text_result = act_assistant.run_assistant_single_paragraph(instructions="")
+    text_result = act_assistant.run_assistant_single_time(instructions="")
     return text_result

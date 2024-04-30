@@ -93,7 +93,7 @@ class BaseAssistant:
             thread_id=self.thread_id, role="user", content=message
         )
         self.logger.info(
-            f"Message sent: {message.content}, thread_id: {self.thread_id}"
+            f"Added message: {message.content}, to thread_id: {self.thread_id}"
         )
 
     def run_assistant(self):
@@ -101,7 +101,7 @@ class BaseAssistant:
 
     def add_example_to_thread(self, example_input: str, example_output: str):
         self.add_message_to_thread(
-            f"For example: **Input:**\n\n{example_input}\n\n**Output:**\n\n{example_output}"
+            f"Example: **Input:**\n\n{example_input}\n\n**Output:**\n\n{example_output}"
         )
 
     def wait_for_run_completion(
