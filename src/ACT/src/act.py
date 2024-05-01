@@ -8,9 +8,8 @@ from anytree.render import AsciiStyle
 from json import JSONEncoder
 
 from redis import Redis
-from rq import Queue
-
-from .act_jobs import process_paragraph_job
+from rq import Queue, get_current_job
+from rq.job import Job
 from log.log import Log
 
 from .pdf_utls import extract_content_for_header, split_into_paragraphs, is_title
@@ -92,12 +91,12 @@ class ACTNode(NodeMixin):
 class ACTTree:  # New class to encapsulate structure logic
     def __init__(self, filepath: Path):
         # Check if the file is a pdf file
-        if filepath.with_suffix(".pdf"):
+        if filepath.suffix == ".pdf":
             self.root = self._build_act_tree(filepath)
             # Assign hierarchical IDs
             self.assign_hierarchical_ids()
             # self.generate_goal()
-        elif filepath.with_suffix(".json"):
+        elif filepath.suffix == ".json":
             self.import_json(filepath)
         else:
             raise ValueError(
@@ -188,6 +187,7 @@ class ACTTree:  # New class to encapsulate structure logic
         exporter = JsonExporter(
             indent=4, sort_keys=True, default=NodeTypeEncoder().default
         )
+        file_path.parent.mkdir(exist_ok=True, parents=True)
         with open(file_path, "w") as outfile:
             exporter.write(self.root, outfile)
 
@@ -231,7 +231,6 @@ class ACTTree:  # New class to encapsulate structure logic
             node.id = node_id
 
             if node.parent is not None:
-                parent_depth = len(str(node.parent.id).split("."))
                 subsection_id = 1
                 for sibling in node.parent.children:
                     if sibling == node and node.parent.parent is not None:
@@ -250,7 +249,7 @@ class ACTTree:  # New class to encapsulate structure logic
                 break
             if node.nodeType == NodeType.PARAGRAPH:
                 act_assistant.add_message_to_thread("Paragraph:\n" + node.text)
-                node.goal = act_assistant.run_assistant_single_paragraph()
+                node.goal = act_assistant.run_assistant_single_time()
             elif node.nodeType == NodeType.TITLE:
                 node.goal = node.text
             elif node.nodeType == NodeType.SECTION:
@@ -261,19 +260,70 @@ class ACTTree:  # New class to encapsulate structure logic
                 node.goal = union_goal
             count += 1
 
-    def generate_goal_job(self):
-        queue = Queue(connection=Redis())
+    def generate_goal_using_job(self, export_path: Path):
+        """
+        Generates a goal using a job for processing paragraphs.
 
-        count = 0
+        Args:
+            export_path (Path): The path to export the generated goal.
+
+        Returns:
+            None
+        """
+        redis_conn = Redis()
+        queue = Queue(name=self.root.name, connection=redis_conn)
+        jobs = []
         for node in self.root.post_order_iter():
             if node.nodeType == NodeType.PARAGRAPH:
-                job = queue.enqueue(process_paragraph_job, node.text)
-            elif node.nodeType == NodeType.TITLE:
-                node.goal = node.text
-            elif node.nodeType == NodeType.SECTION:
-                union_goal = ""
-                for child in node.children:
-                    if child.goal:
-                        union_goal += child.goal
-                node.goal = union_goal
-            count += 1
+                job = Queue.prepare_data(
+                    process_paragraph_job,
+                    (node.text,),
+                    job_id=f"{self.root.name}_{node.id}",
+                    description=f"Processing paragraph {self.root.name}_{node.id}",
+                    result_ttl=3600,  # Result will be kept for 1 hour
+                )
+                jobs.append(job)
+
+        q = queue.enqueue_many(jobs)
+        logger.info(
+            f"Enqueued {len(jobs)} jobs for processing paragraphs for {self.root.name}"
+        )
+        queue.enqueue(generate_goal_job, export_path, depends_on=q)
+        logger.info(f"Enqueued job for generating goal for {self.root.name}")
+
+
+def generate_goal_job(export_path: Path):
+    current_job = get_current_job()
+    act_tree = ACTTree(export_path)
+    logger.info(f"Generating goal for tree: {act_tree.root.name}")
+    for id, node in zip(
+        current_job._dependency_ids,
+        [
+            node
+            for node in act_tree.root.post_order_iter()
+            if node.nodeType == NodeType.PARAGRAPH
+        ],
+    ):
+        try:
+            result = Job.fetch(id, connection=current_job.connection).result
+            node.goal = result
+            logger.info(f"Result of dependent job with id {id}: {result}")
+        except Exception as e:
+            logger.error(f"Error fetching result of job with id {id}: {e}")
+    for node in act_tree.root.post_order_iter():
+        if node.nodeType == NodeType.TITLE:
+            node.goal = node.text
+        elif node.nodeType == NodeType.SECTION:
+            union_goal = ""
+            for child in node.children:
+                if child.goal:
+                    union_goal += f"\n{child.goal}"
+            node.goal = union_goal
+    act_tree.export_json(export_path)
+
+
+def process_paragraph_job(node_text):
+    act_assistant = ACTAssistant()
+    act_assistant.add_message_to_thread("Paragraph:\n" + node_text)
+    text_result = act_assistant.run_assistant_single_time(instructions="")
+    return text_result
