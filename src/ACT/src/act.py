@@ -6,11 +6,13 @@ from anytree.iterators.levelorderiter import LevelOrderIter
 from anytree.iterators.postorderiter import PostOrderIter
 from anytree.render import AsciiStyle
 from json import JSONEncoder
+from pathlib import Path
 
 from redis import Redis
 from rq import Queue, get_current_job
 from rq.job import Job
 from log.log import Log
+
 
 from .pdf_utls import extract_content_for_header, split_into_paragraphs, is_title
 from .assistant import ACTAssistant
@@ -292,10 +294,24 @@ class ACTTree:  # New class to encapsulate structure logic
         logger.info(f"Enqueued job for generating goal for {self.root.name}")
 
 
+# Define jobs for generating goal and processing paragraphs
+
+
 def generate_goal_job(export_path: Path):
+    """
+    Generates goals for the ACT tree based on the results of dependent jobs.
+
+    Args:
+        export_path (Path): The path to export the ACT tree with updated goals.
+
+    Returns:
+        None
+    """
     current_job = get_current_job()
     act_tree = ACTTree(export_path)
     logger.info(f"Generating goal for tree: {act_tree.root.name}")
+
+    # Set goals for nodes based on the results of dependent jobs
     for id, node in zip(
         current_job._dependency_ids,
         [
@@ -310,6 +326,8 @@ def generate_goal_job(export_path: Path):
             logger.info(f"Result of dependent job with id {id}: {result}")
         except Exception as e:
             logger.error(f"Error fetching result of job with id {id}: {e}")
+
+    # Set goals for title and section nodes
     for node in act_tree.root.post_order_iter():
         if node.nodeType == NodeType.TITLE:
             node.goal = node.text
@@ -319,6 +337,7 @@ def generate_goal_job(export_path: Path):
                 if child.goal:
                     union_goal += f"\n{child.goal}"
             node.goal = union_goal
+
     act_tree.export_json(export_path)
 
 

@@ -3,6 +3,7 @@ from werkzeug.utils import secure_filename
 from pathlib import Path
 
 from ACT.src.act import ACTTree
+from job.sample_job import enqueue_sample_job
 
 
 UPLOAD_FOLDER = (
@@ -50,6 +51,27 @@ def upload_file():
     <form method=post enctype=multipart/form-data>
       <input type=file name=file>
       <input type=submit value=Upload>
+    </form>
+    """
+
+
+# Sample job route
+@app.route("/job", methods=["GET", "POST"])
+def run_job():
+    if request.method == "POST":
+        # Run the job
+        if "input_str" in request.form:
+            input_str = request.form["input_str"]
+            enqueue_sample_job(input_str)
+            return "Job enqueued"
+        return "Job is running"
+    return """
+    <!doctype html>
+    <title>Run Job</title>
+    <h1>Run Job</h1>
+    <form method=post>
+    input_str: <input type=text name=input_str>
+      <input type=submit value=Run>
     </form>
     """
 
