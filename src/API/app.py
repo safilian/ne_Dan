@@ -3,6 +3,7 @@ from werkzeug.utils import secure_filename
 from pathlib import Path
 
 from ACT.src.act import ACTTree
+from ACT.src.text_validity_check import get_sections_from_file, validate_section_order
 from job.sample_job import enqueue_sample_job
 
 
@@ -72,6 +73,38 @@ def run_job():
     <form method=post>
     input_str: <input type=text name=input_str>
       <input type=submit value=Run>
+    </form>
+    """
+
+
+# Text validity check route
+@app.route("/text-validity-check", methods=["GET", "POST"])
+def text_validity_check():
+    if request.method == "POST":
+        # check if the post request has the file part
+        if "file" not in request.files:
+            flash("No file part")
+            return redirect(request.url)
+        file = request.files["file"]
+        # if user does not select file, browser also
+        # submit an empty part without filename
+        if file.filename == "":
+            flash("No selected file")
+            return redirect(request.url)
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            save_path = Path(app.config["UPLOAD_FOLDER"]) / "text" / filename
+            file.save(save_path)
+            sections = get_sections_from_file(save_path)
+            is_valid = validate_section_order(sections)
+            return f"Text is valid: {is_valid}"
+    return """
+    <!doctype html>
+    <title>Text Validity Check</title>
+    <h1>Text Validity Check</h1>
+    <form method=post enctype=multipart/form-data>
+      <input type=file name=file>
+      <input type=submit value=Check>
     </form>
     """
 
