@@ -1,4 +1,3 @@
-from gettext import find
 from pathlib import Path
 import re
 
@@ -6,14 +5,19 @@ header_pattern = r"^(\d+(?:\.\d+)*)[\.\s]*([^.\n\r]+)\.?"
 
 
 def get_sections_from_text(text: str):
-    """Extracts the sections from the text."""
+    """Extracts the sections from the text, along with their positions and lengths."""
     sections = []
-    for line in text.split("\n"):
+    current_position = 0  # Track position within the whole text
+    for _, line in enumerate(text.split("\n")):
         match = re.search(header_pattern, line)
         if match:
             number_part = match.group(1)
             text_part = match.group(2)
-            sections.append((number_part, text_part))
+            position = current_position + match.start()  # Adjust for whole text
+            length = match.end() - match.start()
+            sections.append((number_part, text_part, position, length))
+
+        current_position += len(line) + 1  # Update position (including newline)
 
     return sections
 
@@ -41,7 +45,7 @@ def validate_section_order(sections):
     current_level = 0  # Start at the top level
     previous_section_number = ""
 
-    for section_number, section_title in sections:
+    for section_number, _, _, _ in sections:
         number_parts = section_number.split(".")
         current_section_level = len(
             number_parts

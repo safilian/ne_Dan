@@ -1,5 +1,6 @@
-from .act import ACTTree
 from pathlib import Path
+
+from ACT.src.act import ACTTree
 
 sample_filepath = (
     Path(__file__).parent.parent.parent.parent

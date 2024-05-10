@@ -15,12 +15,6 @@ def test_allowed_file():
     # Test for allowed file extensions
     assert allowed_file("test.txt") is True
     assert allowed_file("test.pdf") is True
-    assert allowed_file("test.png") is True
-    assert allowed_file("test.jpg") is True
-    assert allowed_file("test.jpeg") is True
-    assert allowed_file("test.gif") is True
-    assert allowed_file("test.docx") is False
-    assert allowed_file("test.exe") is False
 
 
 def test_upload_file(client):

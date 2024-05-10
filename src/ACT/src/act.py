@@ -11,11 +11,17 @@ from pathlib import Path
 from redis import Redis
 from rq import Queue, get_current_job
 from rq.job import Job
+from ACT.src.text_validity_check import get_sections_from_text, validate_section_order
 from log.log import Log
 
 
-from .pdf_utls import extract_content_for_header, split_into_paragraphs, is_title
-from .assistant import ACTAssistant
+from ACT.src.pdf_utls import (
+    extract_content_for_header,
+    get_section_text,
+    split_into_paragraphs,
+    is_title,
+)
+from ACT.src.assistant import ACTAssistant
 
 logger = Log("act", "act.log")
 
@@ -91,30 +97,34 @@ class ACTNode(NodeMixin):
 
 
 class ACTTree:  # New class to encapsulate structure logic
-    def __init__(self, filepath: Path):
-        # Check if the file is a pdf file
-        if filepath.suffix == ".pdf":
-            self.root = self._build_act_tree(filepath)
-            # Assign hierarchical IDs
-            self.assign_hierarchical_ids()
-            # self.generate_goal()
-        elif filepath.suffix == ".json":
-            self.import_json(filepath)
-        else:
-            raise ValueError(
-                "Invalid file type. Only PDF and JSON files are supported."
-            )
+    def __init__(self, filepath: Path = None, text: str = None):
+        if filepath:
+            # Check if the file is a pdf file
+            if filepath.suffix == ".pdf":
+                self.root = self._build_act_tree_from_pdf(filepath)
+                # Assign hierarchical IDs
+                self.assign_hierarchical_ids()
+                # self.generate_goal()
+            elif filepath.suffix == ".json":
+                self.import_json(filepath)
+            elif filepath.suffix == ".txt":
+                self.build_from_text(filepath)
+                # Assgin hierarchical IDs
+                self.assign_hierarchical_ids()
+            else:
+                raise ValueError(
+                    "Invalid file type. Only PDF and JSON files are supported."
+                )
+        elif text:
+            self.build_from_text(text=text)
 
-    def _build_act_tree(self, filepath: str):
+    def _build_act_tree_from_pdf(self, filepath: Path):
         doc = fitz.open(filepath)
 
         root = ACTNode(0, filepath.name, NodeType.ROOT)  # Create the root node
 
         # Keep track of the current section at each level
         section_stack = [root]
-
-        section_id = 1  # Start with section ID 1
-        subsection_counters = {}  # A dictionary to track subsection IDs at each level
 
         for entry in doc.get_toc():
             level, title, page_number = entry
@@ -145,15 +155,6 @@ class ACTTree:  # New class to encapsulate structure logic
         # Content Association with Paragraphs
         for node in root.level_order_iter():
             if node.nodeType == NodeType.SECTION:
-                node.id = section_id
-                section_id += 1
-
-                subsection_id = (
-                    subsection_counters.get(node.id, 0) + 1
-                )  # Get or initialize
-                # Update the counter
-                subsection_counters[node.id] = subsection_id
-
                 if not node.children:
                     paragraphs = split_into_paragraphs(node.text)
 
@@ -292,6 +293,41 @@ class ACTTree:  # New class to encapsulate structure logic
         )
         queue.enqueue(generate_goal_job, export_path, depends_on=q)
         logger.info(f"Enqueued job for generating goal for {self.root.name}")
+
+    def build_from_text(self, filepath: Path = None, text: str = None):
+        file_text = filepath.read_text()
+        sections = get_sections_from_text(file_text)
+        if not validate_section_order(sections):
+            raise ValueError("Sections are not in valid hierarchical order.")
+        self.root = ACTNode(0, filepath.name, NodeType.ROOT)
+        current_nodes = [self.root]  # Keep track of nodes at each level
+
+        for i in range(len(sections)):
+            section_number, section_header, header_start, header_len = sections[i]
+            next_section_start, next_section_len = (
+                sections[i + 1][2:] if i < len(sections) - 1 else (None, None)
+            )
+            levels = [int(x) for x in section_number.split(".")]
+            new_level = len(levels)
+
+            # Find the appropriate parent
+            while new_level <= len(current_nodes) - 1:
+                current_nodes.pop()  # Pop until we find the right level
+            parent = current_nodes[-1]
+
+            # Create and add the node
+            node = ACTNode(
+                new_level,
+                section_header,
+                NodeType.SECTION,
+                parent=parent,
+                text=get_section_text(
+                    file_text, header_start, header_len, next_section_start
+                ),
+            )
+            current_nodes.append(node)
+
+        return self.root
 
 
 # Define jobs for generating goal and processing paragraphs

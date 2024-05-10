@@ -11,7 +11,7 @@ UPLOAD_FOLDER = (
     Path(__file__).parent.parent.parent / "uploads"
 )  # Path to the uploads folder
 JSON_FOLDER = Path(__file__).parent.parent.parent / "data" / "processed" / "act"
-ALLOWED_EXTENSIONS = {"txt", "pdf", "png", "jpg", "jpeg", "gif"}
+ALLOWED_EXTENSIONS = {"txt", "pdf", "json"}
 
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -40,9 +40,12 @@ def upload_file():
             filename = secure_filename(file.filename)
             save_path = Path(app.config["UPLOAD_FOLDER"]) / "act" / filename
             file.save(save_path)
-            act_tree = ACTTree(save_path)
-            # export_path = Path(app.config["JSON_FOLDER"]) / filename
-            # act_tree.export_json(export_path.with_suffix(".json"))
+            try:
+                act_tree = ACTTree(save_path)
+            except Exception as e:
+                return f"Error: {e}"
+            export_path = Path(app.config["JSON_FOLDER"]) / filename
+            act_tree.export_json(export_path.with_suffix(".json"))
             # act_tree.generate_goal_using_job(export_path.with_suffix(".json"))
             return act_tree.root.print_tree()
     return """
