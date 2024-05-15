@@ -2,6 +2,7 @@ from enum import Enum
 from pathlib import Path
 import fitz  # PyMuPDF
 from anytree import NodeMixin, RenderTree
+from anytree.exporter import JsonExporter
 from anytree.iterators.levelorderiter import LevelOrderIter
 from anytree.iterators.postorderiter import PostOrderIter
 from anytree.render import AsciiStyle
@@ -184,7 +185,6 @@ class ACTTree:  # New class to encapsulate structure logic
         UniqueDotExporter(self.root).to_picture(file_path)
 
     def export_json(self, file_path):
-        from anytree.exporter import JsonExporter
 
         # JSON Export is now independent of the Node class
         exporter = JsonExporter(
@@ -193,6 +193,12 @@ class ACTTree:  # New class to encapsulate structure logic
         file_path.parent.mkdir(exist_ok=True, parents=True)
         with open(file_path, "w") as outfile:
             exporter.write(self.root, outfile)
+
+    def json_serial(self):
+        exporter = JsonExporter(
+            indent=4, sort_keys=True, default=NodeTypeEncoder().default
+        )
+        return exporter.export(self.root)
 
     def import_json(self, file_path):
         from anytree.importer import JsonImporter

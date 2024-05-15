@@ -1,6 +1,7 @@
-from flask import Flask, flash, request, redirect
+from flask import Flask, flash, request, redirect, session
 from werkzeug.utils import secure_filename
 from pathlib import Path
+
 
 from ACT.src.act import ACTTree
 from ACT.src.text_validity_check import get_sections_from_file, validate_section_order
@@ -47,7 +48,8 @@ def upload_file():
             export_path = Path(app.config["JSON_FOLDER"]) / filename
             act_tree.export_json(export_path.with_suffix(".json"))
             # act_tree.generate_goal_using_job(export_path.with_suffix(".json"))
-            return act_tree.root.print_tree()
+            enqueue_sample_job(str(export_path.with_suffix(".json")))
+            return act_tree.json_serial()
     return """
     <!doctype html>
     <title>Upload new File</title>
@@ -113,4 +115,5 @@ def text_validity_check():
 
 
 if __name__ == "__main__":
+    app.debug = True
     app.run()

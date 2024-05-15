@@ -20,7 +20,9 @@ def sample_job_that_run_for_10_seconds(input_str: str):
     logger.info(f"Job completed with input: {input_str}, job_id: {current_job.id}")
     random_next_job_str = random.choice(["job1", "job2", "job3"])
     request(
-        "POST", "http://127.0.0.1:5000/job", data={"input_str": random_next_job_str}
+        "POST",
+        "http://127.0.0.1:6000/software/act_webhook",
+        data={"input_str": random_next_job_str},
     )
     return "This is a sample job that runs for 10 seconds"
 
