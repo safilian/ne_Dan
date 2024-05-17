@@ -29,3 +29,6 @@ Thumbs.db
 
 # ignore database files
 *.rdb
+
+# ignore mkdocs site
+site/

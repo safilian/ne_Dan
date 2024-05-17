@@ -1,6 +1,31 @@
-from flask import Flask, flash, request, redirect
+"""
+This module contains a Flask application that serves as an API for building an ACT (Australian Capital Territory) tree, running sample jobs, and performing text validity checks.
+
+The API provides the following routes:
+- /build-act: Accepts a file upload containing ACT data, builds an ACT tree, and exports it as JSON.
+- /job: Accepts a POST request with an input string and enqueues a sample job.
+- /text-validity-check: Accepts a file upload containing text data and performs a validity check on the text.
+
+The API uses the Flask framework and relies on the following dependencies:
+- flask: A micro web framework for Python.
+- werkzeug: A utility library for handling file uploads.
+- pathlib: A module for working with file paths.
+- ACT.src.act: A module for building an ACT tree.
+- ACT.src.text_validity_check: A module for performing text validity checks.
+- job.sample_job: A module for running sample jobs.
+
+The API configuration includes the following settings:
+- UPLOAD_FOLDER: The path to the folder where uploaded files are saved.
+- JSON_FOLDER: The path to the folder where exported JSON files are saved.
+
+To run the API, execute this script directly.
+"""
+
+# Rest of the code...
+from flask import Flask, flash, request, redirect, session
 from werkzeug.utils import secure_filename
 from pathlib import Path
+
 
 from ACT.src.act import ACTTree
 from ACT.src.text_validity_check import get_sections_from_file, validate_section_order
@@ -11,7 +36,7 @@ UPLOAD_FOLDER = (
     Path(__file__).parent.parent.parent / "uploads"
 )  # Path to the uploads folder
 JSON_FOLDER = Path(__file__).parent.parent.parent / "data" / "processed" / "act"
-ALLOWED_EXTENSIONS = {"txt", "pdf", "png", "jpg", "jpeg", "gif"}
+ALLOWED_EXTENSIONS = {"txt", "pdf", "json"}
 
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -40,11 +65,15 @@ def upload_file():
             filename = secure_filename(file.filename)
             save_path = Path(app.config["UPLOAD_FOLDER"]) / "act" / filename
             file.save(save_path)
-            act_tree = ACTTree(save_path)
-            # export_path = Path(app.config["JSON_FOLDER"]) / filename
-            # act_tree.export_json(export_path.with_suffix(".json"))
+            try:
+                act_tree = ACTTree(save_path)
+            except Exception as e:
+                return f"Error: {e}"
+            export_path = Path(app.config["JSON_FOLDER"]) / filename
+            act_tree.export_json(export_path.with_suffix(".json"))
             # act_tree.generate_goal_using_job(export_path.with_suffix(".json"))
-            return act_tree.root.print_tree()
+            enqueue_sample_job(str(export_path.with_suffix(".json")))
+            return act_tree.json_serial()
     return """
     <!doctype html>
     <title>Upload new File</title>
@@ -110,4 +139,5 @@ def text_validity_check():
 
 
 if __name__ == "__main__":
+    app.debug = True
     app.run()
