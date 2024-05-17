@@ -1,3 +1,27 @@
+"""
+This module contains a Flask application that serves as an API for building an ACT (Australian Capital Territory) tree, running sample jobs, and performing text validity checks.
+
+The API provides the following routes:
+- /build-act: Accepts a file upload containing ACT data, builds an ACT tree, and exports it as JSON.
+- /job: Accepts a POST request with an input string and enqueues a sample job.
+- /text-validity-check: Accepts a file upload containing text data and performs a validity check on the text.
+
+The API uses the Flask framework and relies on the following dependencies:
+- flask: A micro web framework for Python.
+- werkzeug: A utility library for handling file uploads.
+- pathlib: A module for working with file paths.
+- ACT.src.act: A module for building an ACT tree.
+- ACT.src.text_validity_check: A module for performing text validity checks.
+- job.sample_job: A module for running sample jobs.
+
+The API configuration includes the following settings:
+- UPLOAD_FOLDER: The path to the folder where uploaded files are saved.
+- JSON_FOLDER: The path to the folder where exported JSON files are saved.
+
+To run the API, execute this script directly.
+"""
+
+# Rest of the code...
 from flask import Flask, flash, request, redirect, session
 from werkzeug.utils import secure_filename
 from pathlib import Path
